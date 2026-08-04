@@ -1,0 +1,7 @@
+** BUILD FAILED **
+
+
+The following build commands failed:
+	PhaseScriptExecution [CP]\ Check\ Pods\ Manifest.lock /Users/kdas/Library/Developer/Xcode/DerivedData/snapclone-ftmsqcgvlppmvoanlsjzngajvvlk/Build/Intermediates.noindex/snapclone.build/Debug-iphonesimulator/snapclone.build/Script-08A4A3CD28434E44B6B9DE2E.sh (in target 'snapclone' from project 'snapclone')
+	Building project snapclone with scheme snapclone and configuration Debug
+(2 failures)
