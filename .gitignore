@@ -3,3 +3,7 @@
 .env.*
 !.env.example
 .DS_Store
+.env.local
+server/node_modules
+server/.env
+server/tmp
