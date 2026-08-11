@@ -27,12 +27,23 @@ places you'll extend first.
 1. Create a free project at https://supabase.com
 2. In your project, go to **Settings → API** and copy the **Project URL**
    and the **anon/public key**
-3. Create an `.env.local` on the root. Paste in the following keys with YOUR values.
+3. Copy `.env.example` to `.env.local`, then fill in your own values. This file
+   is ignored by Git. Use the Supabase **anon/public** key only — never a
+   service-role key.
 
-```js
-const SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co";
-const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
+EXPO_PUBLIC_SUPABASE_KEY=YOUR-ANON-KEY
 ```
+
+## External API security
+
+The mobile app calls `EXPO_PUBLIC_CHAT_API_URL` and
+`EXPO_PUBLIC_ASTROLOGY_API_URL`. These are public backend endpoint URLs, not
+credentials. Your backend must keep the `OPENAI_API_KEY` and RapidAPI key in
+its own private environment variables and attach them when it calls those
+providers. Do not add either key to an `EXPO_PUBLIC_*` variable: Expo embeds
+those values in the app binary.
 
 4. In Supabase, go to **Authentication → Providers** and make sure
    **Email** is `not` enabled. Under **Authentication →
