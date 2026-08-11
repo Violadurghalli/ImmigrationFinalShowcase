@@ -20,7 +20,7 @@ myHeaders.append("Content-Type", "application/json");
 myHeaders.append("Accept", "application/json");
 myHeaders.append("Authorization", "Bearer " + CHAT_API_URL);
 
-export default function ConversationScreen({ route }) {
+export default function ConversationScreen({ route, navigation }) {
   const { chatbotName } = route.params;
 
   const [message, setMessage] = useState("");
@@ -184,7 +184,7 @@ Respond ONLY with valid JSON.`;
         />
 
         <View style={styles.inputBar}>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("ChatCamera")}>
             <Ionicons name="camera" size={27} color="#000" />
           </TouchableOpacity>
 
