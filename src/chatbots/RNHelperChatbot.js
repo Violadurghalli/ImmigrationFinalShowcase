@@ -4,11 +4,33 @@ import { useHeaderHeight } from "@react-navigation/elements";
 
 const BOT_USER = {
   _id: 2,
-  name: "React Native Chatbot",
-  avatar: "https://loremflickr.com/140/140",
+  name: "Isabella",
+  avatar: "https://loremflickr.com/140/140?lock=2",
 };
 
-export default function BasicChatbot() {
+const REPLIES = [
+  "In React Native, use Flexbox for layout — flex: 1 is your friend.",
+  "Try FlatList for long lists instead of mapping inside ScrollView.",
+  "Expo Go is great for quick previews; use a dev build for native modules.",
+  "useEffect runs after render — put side effects (API calls) there.",
+  "SafeAreaView (or useSafeAreaInsets) keeps UI clear of notches.",
+];
+
+function pickReply(text) {
+  const lower = text.toLowerCase();
+  if (lower.includes("expo")) {
+    return "Expo wraps React Native tooling. Start with `npx expo start`.";
+  }
+  if (lower.includes("style") || lower.includes("css")) {
+    return "RN uses StyleSheet objects, not CSS files. Properties are camelCase.";
+  }
+  if (lower.includes("nav") || lower.includes("screen")) {
+    return "React Navigation stacks + tabs are the usual pattern for screen flow.";
+  }
+  return REPLIES[Math.floor(Math.random() * REPLIES.length)];
+}
+
+export default function RNHelperChatbot() {
   const [messages, setMessages] = useState([]);
   const headerHeight = useHeaderHeight();
 
@@ -16,7 +38,7 @@ export default function BasicChatbot() {
     setMessages([
       {
         _id: 1,
-        text: "Hey! I'm the React Native chatbot. Ask me anything.",
+        text: "Hi! I'm RN Helper. Ask about Expo, styles, navigation, or lists.",
         createdAt: new Date(),
         user: BOT_USER,
       },
@@ -36,7 +58,7 @@ export default function BasicChatbot() {
         GiftedChat.append(previousMessages, [
           {
             _id: Date.now() + 1,
-            text: `You said: "${userText}". Try the other chatbot for more tips!`,
+            text: pickReply(userText),
             createdAt: new Date(),
             user: BOT_USER,
           },
