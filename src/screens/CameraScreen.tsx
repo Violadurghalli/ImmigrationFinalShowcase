@@ -17,7 +17,7 @@ import {
   useCameraPermissions,
   useMicrophonePermissions,
 } from "expo-camera";
-import { Audio, Video, ResizeMode, AVPlaybackStatus } from "expo-av";
+import { Video, ResizeMode } from "expo-av";
 import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "../../utils/hooks/supabase";
 import { uploadSnap, requestDub } from "../../utils/snaps";
@@ -33,26 +33,12 @@ type Capture =
   | { type: "photo"; uri: string }
   | { type: "video"; uri: string };
 
-/** Switch iOS audio session from camera-record → playback (fixes OSStatus 561017449). */
-async function enablePlaybackAudio() {
-  const mode = {
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    staysActiveInBackground: false,
-    shouldDuckAndroid: true,
-    playThroughEarpieceAndroid: false,
-  } as const;
+const DUB_LANGUAGES = [
+  { code: "en", label: "English" },
+  { code: "es", label: "Spanish" },
+] as const;
 
-  try {
-    await Audio.setAudioModeAsync(mode);
-  } catch (error) {
-    console.warn("Audio mode switch failed, retrying…", error);
-    await new Promise((r) => setTimeout(r, 500));
-    await Audio.setAudioModeAsync(mode);
-  }
-}
-
-/** Download remote dubbed MP4 to a local cache file — more reliable than streaming HTTPS after camera use. */
+/** Download remote dubbed MP4 to a local cache file for reliable playback. */
 async function cacheRemoteVideo(remoteUrl: string) {
   const dest = `${FileSystem.cacheDirectory}dubbed-${Date.now()}.mp4`;
   const result = await FileSystem.downloadAsync(remoteUrl, dest);
@@ -60,6 +46,21 @@ async function cacheRemoteVideo(remoteUrl: string) {
     throw new Error(`Could not download dubbed video (HTTP ${result.status})`);
   }
   return result.uri;
+}
+
+function PreviewPlayer({ uri }: { uri: string }) {
+  return (
+    <Video
+      key={uri}
+      source={{ uri }}
+      style={styles.previewVideo}
+      resizeMode={ResizeMode.COVER}
+      shouldPlay
+      isLooping
+      isMuted
+      useNativeControls
+    />
+  );
 }
 
 export default function CameraScreen({ navigation }: Props) {
@@ -73,9 +74,8 @@ export default function CameraScreen({ navigation }: Props) {
   const [isDubbing, setIsDubbing] = useState(false);
   const [dubStatus, setDubStatus] = useState<string | null>(null);
   const [dubbedVideoUrl, setDubbedVideoUrl] = useState<string | null>(null);
-  const [previewReady, setPreviewReady] = useState(false);
+  const [targetLang, setTargetLang] = useState<(typeof DUB_LANGUAGES)[number]["code"]>("en");
   const cameraRef = useRef<CameraView>(null);
-  const videoRef = useRef<Video>(null);
   const isRecordingRef = useRef(false);
   const longPressActiveRef = useRef(false);
 
@@ -152,11 +152,11 @@ export default function CameraScreen({ navigation }: Props) {
       });
 
       if (video?.uri) {
-        // Leave camera-recording audio session before preview playback
-        await enablePlaybackAudio();
+        // Always show preview even if audio-session helpers fail
         setCapture({ type: "video", uri: video.uri });
         setDubbedVideoUrl(null);
-        setPreviewReady(false);
+      } else {
+        console.warn("recordAsync returned no uri", video);
       }
     } catch (error) {
       console.error("Failed to record video:", error);
@@ -177,7 +177,6 @@ export default function CameraScreen({ navigation }: Props) {
   const retake = async () => {
     setDubStatus(null);
     setDubbedVideoUrl(null);
-    setPreviewReady(false);
     setCameraReady(false);
     setCapture(null);
   };
@@ -208,28 +207,30 @@ export default function CameraScreen({ navigation }: Props) {
 
     setIsDubbing(true);
     setDubbedVideoUrl(null);
-    setPreviewReady(false);
 
     try {
       setDubStatus("1/3 Uploading video to Supabase…");
       const uploaded = await uploadSnap(capture);
 
-      setDubStatus("2/3 Dubbing with ElevenLabs…");
+      const langLabel =
+        DUB_LANGUAGES.find((l) => l.code === targetLang)?.label ?? targetLang;
+      setDubStatus(`2/3 Dubbing to ${langLabel} with ElevenLabs…`);
       const result = await requestDub({
         path: uploaded.path,
-        targetLang: "es",
-        sourceLang: "en",
+        targetLang,
+        // Auto-detect spoken language so English dub works from Spanish (or anything)
+        sourceLang: "auto",
       });
 
       setDubStatus("3/3 Loading dubbed video into preview…");
-      await enablePlaybackAudio();
-      // Small delay so iOS releases the camera audio session
-      await new Promise((r) => setTimeout(r, 300));
-
-      // Prefer a local file — remote HTTPS after Camera often hits OSStatus 561017449
-      const localUri = await cacheRemoteVideo(result.dubbedVideoUrl);
-      setDubbedVideoUrl(localUri);
-      setDubStatus(`Dubbed to ${result.targetLang}. Playing dubbed video.`);
+      let playableUri = result.dubbedVideoUrl;
+      try {
+        playableUri = await cacheRemoteVideo(result.dubbedVideoUrl);
+      } catch (downloadError) {
+        console.warn("Local cache failed, playing remote URL", downloadError);
+      }
+      setDubbedVideoUrl(playableUri);
+      setDubStatus(`Dubbed to ${langLabel}. Playing dubbed video.`);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Dubbing failed";
@@ -243,16 +244,6 @@ export default function CameraScreen({ navigation }: Props) {
     }
   };
 
-  const onPreviewStatus = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) {
-      if ("error" in status && status.error) {
-        console.error("Preview playback error:", status.error);
-      }
-      return;
-    }
-    setPreviewReady(true);
-  };
-
   const previewUri =
     capture?.type === "video" ? dubbedVideoUrl || capture.uri : capture?.uri;
 
@@ -260,58 +251,71 @@ export default function CameraScreen({ navigation }: Props) {
     return (
       <View style={styles.container}>
         {capture.type === "photo" ? (
-          <Image source={{ uri: capture.uri }} style={StyleSheet.absoluteFill} />
+          <Image source={{ uri: capture.uri }} style={styles.previewVideo} />
+        ) : previewUri ? (
+          <PreviewPlayer key={previewUri} uri={previewUri} />
         ) : (
-          <Video
-            key={previewUri}
-            ref={videoRef}
-            source={{ uri: previewUri! }}
-            style={StyleSheet.absoluteFill}
-            resizeMode={ResizeMode.COVER}
-            shouldPlay
-            isLooping
-            isMuted={false}
-            volume={1.0}
-            useNativeControls
-            onPlaybackStatusUpdate={onPreviewStatus}
-            onError={(e) => {
-              console.error("Video onError:", e);
-              Alert.alert(
-                "Playback error",
-                "Could not play this video. Try retaking, or check the file in Supabase Storage → snaps → dubbed.",
-              );
-            }}
-          />
+          <View style={styles.videoPreview}>
+            <Text style={styles.videoPreviewLabel}>No video URI</Text>
+          </View>
         )}
         {dubStatus ? (
           <View style={styles.statusBanner} pointerEvents="none">
             <Text style={styles.dubStatus}>{dubStatus}</Text>
-            {dubbedVideoUrl && previewReady ? (
+            {dubbedVideoUrl ? (
               <Text style={styles.dubStatusSub}>Dubbed preview ready</Text>
             ) : null}
           </View>
         ) : null}
-        <SafeAreaView style={styles.overlay}>
-          <View style={styles.topBar}>
+        <SafeAreaView style={styles.overlay} pointerEvents="box-none">
+          <View style={styles.topBar} pointerEvents="box-none">
             <TouchableOpacity style={styles.iconButton} onPress={retake}>
               <Text style={styles.iconText}>✕</Text>
             </TouchableOpacity>
           </View>
           <View style={styles.previewActions}>
             {capture.type === "video" ? (
-              <TouchableOpacity
-                style={[styles.dubButton, isDubbing && styles.buttonDisabled]}
-                onPress={handleDub}
-                disabled={isDubbing}
-              >
-                {isDubbing ? (
-                  <ActivityIndicator color="#111" />
-                ) : (
-                  <Text style={styles.dubButtonText}>
-                    {dubbedVideoUrl ? "Re-dub to Spanish" : "Dub to Spanish"}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              <>
+                <View style={styles.langRow}>
+                  {DUB_LANGUAGES.map((lang) => {
+                    const selected = targetLang === lang.code;
+                    return (
+                      <TouchableOpacity
+                        key={lang.code}
+                        style={[
+                          styles.langChip,
+                          selected && styles.langChipSelected,
+                          isDubbing && styles.buttonDisabled,
+                        ]}
+                        onPress={() => setTargetLang(lang.code)}
+                        disabled={isDubbing}
+                      >
+                        <Text
+                          style={[
+                            styles.langChipText,
+                            selected && styles.langChipTextSelected,
+                          ]}
+                        >
+                          {lang.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TouchableOpacity
+                  style={[styles.dubButton, isDubbing && styles.buttonDisabled]}
+                  onPress={handleDub}
+                  disabled={isDubbing}
+                >
+                  {isDubbing ? (
+                    <ActivityIndicator color="#111" />
+                  ) : (
+                    <Text style={styles.dubButtonText}>
+                      {`Dub to ${DUB_LANGUAGES.find((l) => l.code === targetLang)?.label}`}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </>
             ) : null}
             <TouchableOpacity
               style={[styles.sendButton, isDubbing && styles.buttonDisabled]}
@@ -417,9 +421,14 @@ const styles = StyleSheet.create({
     borderRadius: 24,
   },
   permissionButtonText: { fontWeight: "800", color: "#111" },
+  previewVideo: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
   overlay: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: "space-between",
+    backgroundColor: "transparent",
   },
   topBar: {
     flexDirection: "row",
@@ -493,6 +502,31 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     gap: 12,
     alignItems: "flex-end",
+  },
+  langRow: {
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "flex-end",
+  },
+  langChip: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.35)",
+  },
+  langChipSelected: {
+    backgroundColor: "#fff",
+    borderColor: "#fff",
+  },
+  langChipText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  langChipTextSelected: {
+    color: "#111",
   },
   dubButton: {
     backgroundColor: "#fff",

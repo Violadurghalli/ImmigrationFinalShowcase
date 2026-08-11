@@ -33,7 +33,8 @@
           "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to take Snaps.",
           "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone to record Snaps."
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

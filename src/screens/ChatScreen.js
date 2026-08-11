@@ -41,30 +41,27 @@ export default function ChatScreen({ navigation }) {
       <Header title="Chat" />
 
       {chats.map((chat) => (
-        <TouchableOpacity
-          key={chat.id}
-          style={styles.userButton}
-          onPress={() =>
-            navigation.navigate("Conversation", {
-              chatbotName: chat.name,
-              chatId: chat.id,
-            })
-          }
-        >
-          <Ionicons name="person-circle" size={48} color="#D8D8D8" />
-
-          <Text style={styles.userName}>{chat.name}</Text>
+        <View key={chat.id} style={styles.userButton}>
+          <TouchableOpacity
+            style={styles.userMain}
+            onPress={() =>
+              navigation.navigate("Conversation", {
+                chatbotName: chat.name,
+                chatId: chat.id,
+              })
+            }
+          >
+            <Ionicons name="person-circle" size={48} color="#D8D8D8" />
+            <Text style={styles.userName}>{chat.name}</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            onPress={(e) => {
-              e.stopPropagation?.();
-              navigation.navigate("ChatCamera");
-            }}
+            onPress={() => navigation.navigate("ChatCamera")}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Ionicons name="camera-outline" size={24} color="#999" />
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
       ))}
     </View>
   );
@@ -84,6 +81,12 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     borderBottomWidth: 1,
     borderColor: "#EFEFEF",
+  },
+
+  userMain: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
   },
 
   userName: {
