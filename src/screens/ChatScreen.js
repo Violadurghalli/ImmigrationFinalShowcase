@@ -5,6 +5,7 @@ import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import Ionicons from "@expo/vector-icons/Ionicons";
 import Header from "../components/Header";
 import BasicChatbot from "../chatbots/BasicChatbot";
+import RNHelperChatbot from "../chatbots/RNHelperChatbot";
 
 export const CHATBOTS = {
   BasicChatbot: {
@@ -12,6 +13,12 @@ export const CHATBOTS = {
     name: "React Native Chatbot",
     imageUrl: "https://loremflickr.com/140/140",
     component: BasicChatbot,
+  },
+  RNHelperChatbot: {
+    id: "RNHelperChatbot",
+    name: "RN Helper",
+    imageUrl: "https://loremflickr.com/140/140?lock=2",
+    component: RNHelperChatbot,
   },
 };
 
@@ -48,7 +55,15 @@ export default function ChatScreen({ navigation }) {
 
           <Text style={styles.userName}>{chat.name}</Text>
 
-          <Ionicons name="camera-outline" size={24} color="#999" />
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation?.();
+              navigation.navigate("ChatCamera");
+            }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Ionicons name="camera-outline" size={24} color="#999" />
+          </TouchableOpacity>
         </TouchableOpacity>
       ))}
     </View>

@@ -11,6 +11,7 @@ import FriendStory from "../screens/FriendStory";
 import AstrologyScreen from "../screens/AstrologyScreen";
 import MemoryScreen from "../screens/MemoryScreen";
 import EventScreen from "../screens/EventScreen"; //New component by Sona and Christian
+import ChatCameraScreen from "../screens/CameraScreen.tsx";
 
 const Stack = createStackNavigator();
 
@@ -38,6 +39,11 @@ export default function App() {
           name="Conversation"
           component={ConversationScreen}
           options={{ headerShown: true }}
+        />
+        <Stack.Screen
+          name="ChatCamera"
+          component={ChatCameraScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="DiscoverCard"

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useLayoutEffect } from "react";
 import {
   SafeAreaView,
   View,
@@ -13,8 +13,34 @@ import {
 
 import Ionicons from "@expo/vector-icons/Ionicons";
 
-export default function ConversationScreen({ route }) {
-  const { chatbotName } = route.params;
+const BOT_REPLIES = {
+  BasicChatbot: (text) =>
+    `You said: "${text}". Try RN Helper for more tips!`,
+  RNHelperChatbot: (text) => {
+    const lower = text.toLowerCase();
+    if (lower.includes("expo")) {
+      return "Expo wraps React Native tooling. Start with `npx expo start`.";
+    }
+    if (lower.includes("style") || lower.includes("css")) {
+      return "RN uses StyleSheet objects, not CSS files. Properties are camelCase.";
+    }
+    if (lower.includes("nav") || lower.includes("screen")) {
+      return "React Navigation stacks + tabs are the usual pattern for screen flow.";
+    }
+    const tips = [
+      "In React Native, use Flexbox for layout — flex: 1 is your friend.",
+      "Try FlatList for long lists instead of mapping inside ScrollView.",
+      "Expo Go is great for quick previews; use a dev build for native modules.",
+      "useEffect runs after render — put side effects (API calls) there.",
+      "SafeAreaView (or useSafeAreaInsets) keeps UI clear of notches.",
+    ];
+    return tips[Math.floor(Math.random() * tips.length)];
+  },
+};
+
+export default function ConversationScreen({ route, navigation }) {
+  const { chatbotName, chatId } = route.params ?? {};
+  const displayName = chatbotName ?? "Chat";
 
   const [message, setMessage] = useState("");
 
@@ -22,7 +48,7 @@ export default function ConversationScreen({ route }) {
     {
       id: "1",
       sender: "bot",
-      name: chatbotName,
+      name: displayName,
       text: "Hi Sarah",
       color: "#00A7B5",
     },
@@ -37,21 +63,40 @@ export default function ConversationScreen({ route }) {
 
   const listRef = useRef();
 
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: displayName });
+  }, [navigation, displayName]);
+
   function sendMessage() {
     if (!message.trim()) return;
 
-    setMessages([
-      ...messages,
-      {
-        id: Date.now().toString(),
-        sender: "me",
-        name: "ME",
-        text: message,
-        color: "#FF2D55",
-      },
-    ]);
+    const userText = message.trim();
+    const userMessage = {
+      id: Date.now().toString(),
+      sender: "me",
+      name: "ME",
+      text: userText,
+      color: "#FF2D55",
+    };
 
+    setMessages((prev) => [...prev, userMessage]);
     setMessage("");
+
+    const replyFn = chatId ? BOT_REPLIES[chatId] : null;
+    if (replyFn) {
+      setTimeout(() => {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            sender: "bot",
+            name: displayName,
+            text: replyFn(userText),
+            color: "#00A7B5",
+          },
+        ]);
+      }, 600);
+    }
   }
 
   function renderMessage({ item }) {
@@ -93,7 +138,7 @@ export default function ConversationScreen({ route }) {
           <Text>🙂</Text>
         </View>
 
-        <Text style={styles.username}>{chatbotName}</Text>
+        <Text style={styles.username}>{displayName}</Text>
 
         <View style={styles.headerIcons}>
           <Ionicons name="call" size={23} />
@@ -120,7 +165,7 @@ export default function ConversationScreen({ route }) {
 
         <View style={styles.inputBar}>
           {/* Camera */}
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("ChatCamera")}>
             <Ionicons name="camera" size={27} color="#000" />
           </TouchableOpacity>
 
@@ -158,6 +203,7 @@ export default function ConversationScreen({ route }) {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

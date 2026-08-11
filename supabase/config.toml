@@ -1,0 +1,3 @@
+# Edge Functions config (used by Supabase CLI)
+[functions.dub-snap]
+verify_jwt = true
